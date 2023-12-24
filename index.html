@@ -1,0 +1,212 @@
+<html>
+
+<head>
+  <style>
+    html,
+    body {
+      background-color: #000;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden !important;
+    }
+  </style>
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+  <script src="https://get.goxtk.com/xtk_xdat.gui.js"></script>
+  <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@latest/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@latest/examples/jsm/"
+        }
+      }
+    </script>
+  <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+    var renderer, controls, scene, camera;
+    var stats, gui, spotLight, lightHelper;
+    var mesh, SecondMesh;
+    var SecondGeometry, SecondMaterial, geometry, material;
+
+    init();
+    animate();
+
+    function init() {
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+      renderer.setAnimationLoop(render);
+
+      // window.THREE = THREE;
+      scene = new THREE.Scene();
+
+      var fov = 100;
+      var ratio = window.innerWidth / window.innerHeight;
+      var zNear = 0.1;
+      var zFar = 100;
+      camera = new THREE.PerspectiveCamera(fov, ratio, zNear, zFar);
+      camera.position.set(0, 10, 20);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.minDistance = 2;
+      controls.maxDistance = 10;
+      controls.maxPolarAngle = Math.PI / 2;
+      controls.target.set(0, 1, 0);
+      controls.update();
+
+      // setup lights 
+      var ambient = new THREE.HemisphereLight(0xffffff, 0x8d8d8d, 0.15);
+      // uncomment to see other meterials
+      // scene.add(ambient);
+
+      // setup spotlight
+      spotLight = new THREE.SpotLight(0x8E7CC3);
+      spotLight.position.set(-2, 15, -2);
+      spotLight.angle = Math.PI / 5; // Adjust the angle 
+      spotLight.penumbra = 1; // Adjust the penumbra value (the fade area at the edge of the light)
+      spotLight.distance = 100; // Adjust the distance the light reaches
+      spotLight.decay = 1.5; // Adjust the amount the light dims along the distance of the light.
+      spotLight.intensity = 1000; // Adjust the intensity of the spotlight
+
+      // geometry
+      geometry = new THREE.SphereGeometry( 2, 32, 32 ); 
+      material = new THREE.MeshPhongMaterial({
+        color: 0x2F00A7,
+        shininess: 30,
+        specular: 0x47E800
+      });
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(3, 0, 0);
+
+      // second geometry
+      SecondGeometry = new THREE.TorusKnotGeometry( 1.5, 0.5, 100, 20 ); ;
+      SecondMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xC27BA0,
+        metalness: 0,
+				roughness: 0,
+        specularColor: 0x47E800
+      });
+      SecondMesh = new THREE.Mesh(SecondGeometry, SecondMaterial);
+      SecondMesh.position.set(-3, 0, 0);
+
+      // floor
+      var geoFloor = new THREE.PlaneGeometry(300, 300);
+      var matFloor = new THREE.MeshPhongMaterial({
+        color: 0xffffff
+      });
+      var mshFloor = new THREE.Mesh(geoFloor, matFloor);
+      mshFloor.position.set(0, -10, 0);
+      mshFloor.rotation.x = - Math.PI * 0.5;// make it stay horizontally
+
+      // >>> optional but hightly recomend <<<
+
+      // add light helper
+      lightHelper = new THREE.SpotLightHelper(spotLight);
+
+      // optional but hightly recomend
+      mesh.castShadow = true;
+      SecondMesh.castShadow = true;
+      spotLight.castShadow = true;
+      mshFloor.receiveShadow = true; // if you want to see the shadow, make it true
+
+      // Add to scene
+      scene.add(mshFloor);
+      scene.add(mesh);
+      scene.add(SecondMesh);
+      scene.add(spotLight); // light without line helper.
+      scene.add(lightHelper); // this is the line that help to indicate the spotlight structure
+
+      renderer.shadowMap.enabled = true; // important!! for casting a shadow to the floor.
+
+      // GUI
+      var gui = new dat.GUI();
+
+      var projector = {
+        None: null,
+        Texture1: 'wallpaper.png',
+        // Add more textures (.png file) here...
+      };
+      var spotlightPosition = {
+        x: spotLight.position.x,
+        y: spotLight.position.y,
+        z: spotLight.position.z
+      };
+
+      // GUI for spotlight
+      var sceneui = gui.addFolder("Spotlight");
+      sceneui.add(spotLight, 'map', projector).name('Light projector').onChange(function (value) {
+        spotLight.map = (value !== 'None') ? new THREE.TextureLoader().load(value) : null;
+      });
+      sceneui.add(spotLight, "intensity", 100, 3000).name("Light Intensity");
+      sceneui.add(spotlightPosition, "x", -20, 20).name("X Axis").onChange(function (value) {
+        spotLight.position.x = value;
+        lightHelper.update();
+      });
+      sceneui.add(spotlightPosition, "y", -20, 20).name("Y Axis").onChange(function (value) {
+        spotLight.position.y = value;
+        lightHelper.update();
+      });
+      sceneui.add(spotlightPosition, "z", -20, 20).name("Z Axis").onChange(function (value) {
+        spotLight.position.z = value;
+        lightHelper.update();
+      });
+      sceneui.open();
+
+      // GUI for MeshPhongMaterial
+      var meshui = gui.addFolder("Mesh1: MeshPhongMaterial");
+      meshui.add(material, "shininess", 1, 100).name("Shininess");
+      meshui.addColor(material, "specular").onChange(function () {
+          material.color.set(material.color);
+        });
+      meshui.open();
+
+      // GUI for MeshPhysicalMaterial
+      var meshui2 = gui.addFolder("Mesh2: MeshPhysicalMaterial");
+      meshui2.add(SecondMaterial, "roughness", 0.0, 1.0).name("Roughness");
+      meshui2.add(SecondMaterial, "metalness", 0.0, 1.0).name("Metalness");
+      meshui2.addColor(SecondMaterial, "specularColor").onChange(function () {
+        SecondMaterial.color.set(SecondMaterial.color);
+        });
+       meshui2.open();
+    };
+
+    function animate() {
+      var theta = performance.now() / 1000; // Theta can be adjust
+
+      // Calculate new x and z positions based on time for circular movement
+      var radius = 10;
+      var x = Math.cos(theta) * radius; // Calculate x-position based on time
+      var z = Math.sin(theta) * radius; // Calculate z-position based on time
+
+      // Maintain the y-position of the spotlight
+      var y = spotLight.position.y;
+
+      // Set the new position for the spotlight
+      spotLight.position.set(x, y, z); // comment this if you want to controll X and Z GUI
+
+      // Update the light helper
+      lightHelper.update();
+
+      // Rotate the mesh
+      SecondMesh.rotation.x -= 0.005;
+      SecondMesh.rotation.y += 0.005;
+
+      // Continue the animation loop
+      requestAnimationFrame(animate);
+
+      // Render the scene
+      renderer.render(scene, camera);
+    }
+
+    function render() {
+      renderer.render(scene, camera);
+    }
+  </script>
+</head>
+<body></body>
+</html>
